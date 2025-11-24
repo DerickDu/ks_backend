@@ -71,13 +71,23 @@ def create_app(config_name=None):
     # 健康检查端点
     @app.route('/health')
     def health_check():
-        """健康检查端点，用于监控系统状态"""
+        """
+        健康检查端点，用于监控系统状态
+        """
         try:
-            # 尝试执行一个简单的数据库查询，验证数据库连接
+            # 尝试执行一个简单的数据库查询，验证数据库连接和schema设置
             from sqlalchemy import text
             with db.engine.connect() as conn:
-                conn.execute(text('SELECT 1'))
-            db_status = "connected"
+                # 检查ks schema是否存在并且可访问
+                result = conn.execute(text("SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'ks'"))
+                schema_exists = result.fetchone() is not None
+                
+                if schema_exists:
+                    # 在ks schema中执行简单查询
+                    conn.execute(text('SELECT 1'))
+                    db_status = "connected (ks schema available)"
+                else:
+                    db_status = "connected (ks schema not found)"
         except Exception as e:
             db_status = f"error: {str(e)}"
         

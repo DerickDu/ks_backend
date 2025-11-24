@@ -35,22 +35,66 @@ ks_backend/
 
 ```bash
 python3 -m pip install -r requirements.txt
-```
-
 ### 3. 配置环境变量
 
 复制`.env`文件并根据实际情况修改配置：
 
 ```bash
-# 数据库连接配置
-DATABASE_URL="postgresql://admin:password@localhost:5432/example_db"
+# 数据库连接配置（必须包含search_path参数设置ks schema）
+DATABASE_URL="postgresql://admin:password@localhost:5432/example_db?options=-c%20search_path=ks"
 
 # Flask应用配置
 FLASK_APP="app.py"
 FLASK_ENV="development"
-SECRET_KEY="your-secret-key-here"
+```
 
-# 应用配置
+## 数据库Schema配置
+
+本项目使用PostgreSQL数据库，并要求所有数据表必须位于`ks` schema下。这一配置通过多种方式实现，确保数据库操作的一致性和安全性：
+
+### 1. 数据库连接配置
+
+- 在`.env`文件中，通过URL参数`options=-c%20search_path=ks`设置默认schema
+- 在`config.py`中，通过SQLAlchemy配置参数进一步确认schema设置
+
+### 2. 模型定义中的Schema设置
+
+所有数据库模型在定义时都明确指定了schema：
+
+```python
+class ExampleModel(db.Model):
+    __tablename__ = 'example_table'
+    __table_args__ = {'schema': 'ks'}
+    # 字段定义...
+```
+
+### 3. 数据库操作规范
+
+- **使用ORM操作**：项目中所有数据库操作都应通过SQLAlchemy ORM进行，确保自动使用正确的schema
+- **直接SQL查询**：如果需要执行原始SQL，必须明确指定schema前缀：
+  ```sql
+  SELECT * FROM ks.table_name WHERE condition;
+  ```
+- **测试验证**：项目包含专门的数据库schema测试文件`tests/test_db_schema.py`，用于验证schema配置
+
+### 4. Schema权限管理
+
+确保数据库用户（如`.env`中的`admin`用户）具有以下权限：
+- 创建和访问`ks` schema的权限
+- 在`ks` schema中创建和管理表的权限
+- 对`ks` schema中所有表的读写权限
+
+### 5. 健康检查
+
+应用的`/health`端点包含对数据库schema的检查，可以通过访问该端点验证schema配置是否正确：
+
+```bash
+curl http://localhost:5000/health
+```
+
+健康状态中应包含`connected (ks schema available)`信息，表明数据库连接和schema配置均正常。
+  
+  # 应用配置
 APP_NAME="Entity Management API"
 APP_VERSION="1.0.0"
 ```

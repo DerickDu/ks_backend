@@ -21,6 +21,19 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False  # 禁用修改跟踪以提高性能
     SQLALCHEMY_ECHO = False  # 在生产环境中关闭SQL查询日志
     
+    # PostgreSQL特定配置
+    # 设置默认schema为'ks'，确保所有数据库操作都在正确的schema中进行
+    SQLALCHEMY_BINDS = {
+        'default': os.environ.get('DATABASE_URL')
+    }
+    
+    # SQLAlchemy 2.0+ 配置方式
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_size': 10,
+        'max_overflow': 20
+    }
+    
     # CORS配置
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')
     
