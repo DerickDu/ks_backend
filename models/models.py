@@ -50,22 +50,18 @@ class Catalog(db.Model):
     - sub_domain: 第二级节点
     """
     __tablename__ = 'catalog'
-    __table_args__ = {'schema': 'ks',
-        Index('idx_catalog_domain', 'domain')
-    }
+    __table_args__ = (
+        Index('idx_catalog_domain', 'domain'),
+        {'schema': 'ks'}
+    )
     
-    entity_id = db.Column(db.BigInteger, ForeignKey('ks.entities.entity_id'), primary_key=True)
+    entity_id = db.Column(db.BigInteger, ForeignKey('ks.entities.entity_id', ondelete='CASCADE'), primary_key=True)
     path = db.Column(db.String(255), nullable=False)
     domain = db.Column(db.String(100), nullable=False, index=True)  # 添加索引以优化按domain查询
     sub_domain = db.Column(db.String(100))
     
     # 关系定义
     entity = relationship('Entities', back_populates='catalogs')
-    
-    # 添加索引以优化性能
-    __table_args__ = (
-        Index('idx_catalog_domain', 'domain'),
-    )
     
     def __repr__(self):
         return f'<Catalog entity_id={self.entity_id}, domain={self.domain}>'
@@ -80,10 +76,13 @@ class EntitiesSourceMap(db.Model):
     - entity_id: 联合主键，关联Entities表的entity_id
     """
     __tablename__ = 'entities_source_map'
-    __table_args__ = {'schema': 'ks'}
+    __table_args__ = (
+        PrimaryKeyConstraint('source_id', 'entity_id'),
+        {'schema': 'ks'}
+    )
     
-    source_id = db.Column(db.BigInteger, ForeignKey('ks.entities_sources.source_id'), primary_key=True)
-    entity_id = db.Column(db.BigInteger, ForeignKey('ks.entities.entity_id'), primary_key=True)
+    source_id = db.Column(db.BigInteger, ForeignKey('ks.entities_sources.source_id', ondelete='CASCADE'))
+    entity_id = db.Column(db.BigInteger, ForeignKey('ks.entities.entity_id', ondelete='CASCADE'))
     
     # 关系定义
     source = relationship('EntitiesSources', back_populates='entity_source_maps')
@@ -104,7 +103,7 @@ class EntitiesSources(db.Model):
     - created_at: 创建时间
     """
     __tablename__ = 'entities_sources'
-    __table_args__ = {'schema': 'ks'},
+    __table_args__ = {'schema': 'ks'}
     
     source_id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     source_type = db.Column(db.String(100), nullable=False, index=True)
