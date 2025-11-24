@@ -108,7 +108,95 @@ python3 app.py
 - 200: 成功
 - 500: 服务器内部错误
 
-### 3. 健康检查
+### 3. 获取Domain和SubDomain树形结构
+
+**端点：** `GET /api/entities/domains-tree`
+
+**功能：** 获取所有不同的domain和sub_domain数据，并转换为Ant Design Tree组件所需的数据格式。
+
+**查询参数：**
+- `refresh` (可选，布尔值): 强制刷新缓存，立即重新计算树形结构
+
+**响应格式：**
+```json
+[
+    {
+        "key": "domain1",
+        "title": "领域名称1",
+        "children": [
+            {
+                "key": "domain1_subdomain1",
+                "title": "子领域1"
+            },
+            {
+                "key": "domain1_subdomain2",
+                "title": "子领域2"
+            }
+        ]
+    },
+    {
+        "key": "domain2",
+        "title": "领域名称2"
+    }
+]
+```
+
+**状态码：**
+- 200: 成功
+- 500: 服务器内部错误
+
+### 4. 获取实体和目录树形结构
+
+**端点：** `GET /api/entities-tree`
+
+**功能：** 根据指定的domain和sub_domain获取对应的实体和目录树形结构，返回符合Ant Design Tree格式的数据。
+
+**查询参数：**
+- `domain` (必需，字符串): 指定要查询的域
+- `sub_domain` (必需，字符串): 指定要查询的子域
+- `refresh` (可选，布尔值): 设置为 `true` 时强制刷新缓存
+
+**响应格式：**
+```json
+[
+  {
+    "key": "通信/无线通信/5G",
+    "title": "5G",
+    "isLeaf": false,
+    "children": [
+      {
+        "key": "通信/无线通信/5G/毫米波",
+        "title": "毫米波",
+        "isLeaf": true,
+        "entity_id": 10,
+        "children": []
+      },
+      {
+        "key": "通信/无线通信/5G/大规模MIMO",
+        "title": "大规模MIMO",
+        "isLeaf": true,
+        "entity_id": 11,
+        "children": []
+      }
+    ],
+    "entity_id": 8
+  },
+  {
+    "key": "通信/无线通信/WiFi",
+    "title": "WiFi",
+    "isLeaf": true,
+    "entity_id": 9,
+    "children": []
+  }
+]
+```
+
+**状态码：**
+- 200: 成功获取实体树结构
+- 400: 请求参数错误
+- 500: 服务器内部错误
+
+### 5. 健康检查
 
 **端点：** `GET /health`
 
