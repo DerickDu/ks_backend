@@ -1,7 +1,8 @@
 from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func
 
-from models import Catalog, Entities, db
+from models import Catalog, Entities, EntitiesSources, EntitiesSourceMap, db
 from utils.error_handlers import handle_db_error
 from utils.validators import QueryParamsValidator, validate_query_params
 
@@ -423,6 +424,68 @@ def get_entities_tree():
     except ValueError as e:
         # 参数格式错误
         return jsonify({"error": f"参数错误: {str(e)}"}), 400
+    except SQLAlchemyError as e:
+        # 捕获并处理SQLAlchemy相关错误
+        return handle_db_error(e)
+    except Exception as e:
+        # 捕获其他未预期的错误
+        return jsonify({"error": f"服务器内部错误: {str(e)}"}), 500
+
+
+@entities_bp.route('/count-by-source-type', methods=['GET'])
+@validate_query_params()
+def get_entities_count_by_source_type():
+    """
+    统计Entities Source表中不同source_type对应的实体数量
+    
+    该端点通过关联查询EntitiesSources和EntitiesSourceMap表，
+    统计每个source_type对应的唯一entity_id数量。
+    
+    响应格式：
+    - 成功: {"source_type1": count1, "source_type2": count2, ...}
+    - 失败: {"error": "错误信息"}
+    
+    HTTP状态码：
+    - 200: 成功获取统计数据
+    - 500: 服务器内部错误，包括数据库连接错误或查询错误
+    
+    示例请求：
+    GET /api/entities/count-by-source-type
+    
+    示例响应：
+    {
+        "数据库": 15,
+        "API接口": 23,
+        "文件系统": 42
+    }
+    
+    性能优化说明：
+    - 使用JOIN操作连接EntitiesSources和EntitiesSourceMap表
+    - 使用COUNT和GROUP BY进行聚合统计
+    - 利用source_type字段上的索引加速查询
+    """
+    try:
+        # 执行关联查询，统计每个source_type对应的唯一entity_id数量
+        # JOIN EntitiesSources和EntitiesSourceMap表
+        query = db.session.query(
+            EntitiesSources.source_type,
+            func.count(EntitiesSourceMap.entity_id).label('count')
+        ).join(
+            EntitiesSourceMap,
+            EntitiesSources.source_id == EntitiesSourceMap.source_id
+        ).group_by(
+            EntitiesSources.source_type
+        )
+        
+        # 执行查询并获取结果
+        result = query.all()
+        
+        # 将查询结果转换为字典格式
+        source_type_counts = {source_type: count for source_type, count in result}
+        
+        # 返回结果
+        return jsonify(source_type_counts), 200
+        
     except SQLAlchemyError as e:
         # 捕获并处理SQLAlchemy相关错误
         return handle_db_error(e)

@@ -1,7 +1,7 @@
 import unittest
 from flask import json
 from app import create_app
-from models import db, Catalog
+from models import db, Catalog, Entities, EntitiesSources, EntitiesSourceMap
 
 
 class EntitiesRoutesTestCase(unittest.TestCase):
@@ -37,8 +37,27 @@ class EntitiesRoutesTestCase(unittest.TestCase):
         """
         添加测试数据到数据库
         """
+        # 创建一些测试实体数据
+        entities_data = [
+            Entities(entity_id=1, entity_name="实体1", description="第一个实体"),
+            Entities(entity_id=2, entity_name="实体2", description="第二个实体"),
+            Entities(entity_id=3, entity_name="实体3", description="第三个实体"),
+            Entities(entity_id=4, entity_name="实体4", description="第四个实体"),
+            Entities(entity_id=5, entity_name="实体5", description="第五个实体"),
+            Entities(entity_id=6, entity_name="实体6", description="第六个实体"),
+            Entities(entity_id=7, entity_name="实体7", description="第七个实体"),
+            Entities(entity_id=8, entity_name="实体8", description="第八个实体"),
+            Entities(entity_id=9, entity_name="实体9", description="第九个实体"),
+            Entities(entity_id=10, entity_name="实体10", description="第十个实体"),
+            Entities(entity_id=11, entity_name="实体11", description="第十一个实体"),
+            Entities(entity_id=12, entity_name="实体12", description="第十二个实体"),
+            Entities(entity_id=13, entity_name="实体13", description="第十三个实体"),
+            Entities(entity_id=14, entity_name="实体14", description="第十四个实体"),
+            Entities(entity_id=15, entity_name="实体15", description="第十五个实体"),
+        ]
+        
         # 创建一些测试数据，包含复杂路径用于测试树形结构
-        test_data = [
+        catalog_data = [
             # 简单路径测试
             Catalog(entity_id=1, path="通信/无线通信", domain="通信", sub_domain="无线通信"),
             Catalog(entity_id=2, path="通信/光纤通信", domain="通信", sub_domain="光纤通信"),
@@ -59,7 +78,34 @@ class EntitiesRoutesTestCase(unittest.TestCase):
             Catalog(entity_id=15, path="计算机/软件/编程语言/Java", domain="计算机", sub_domain="软件"),
         ]
         
-        db.session.add_all(test_data)
+        # 创建一些测试数据源
+        sources_data = [
+            EntitiesSources(source_id=1, source_type="数据库"),
+            EntitiesSources(source_id=2, source_type="API接口"),
+            EntitiesSources(source_id=3, source_type="文件系统"),
+            EntitiesSources(source_id=4, source_type="数据库"),
+            EntitiesSources(source_id=5, source_type="API接口"),
+        ]
+        
+        # 创建实体与数据源的映射关系
+        source_map_data = [
+            EntitiesSourceMap(source_id=1, entity_id=1),
+            EntitiesSourceMap(source_id=1, entity_id=2),
+            EntitiesSourceMap(source_id=2, entity_id=3),
+            EntitiesSourceMap(source_id=2, entity_id=4),
+            EntitiesSourceMap(source_id=3, entity_id=5),
+            EntitiesSourceMap(source_id=4, entity_id=6),
+            EntitiesSourceMap(source_id=4, entity_id=7),
+            EntitiesSourceMap(source_id=5, entity_id=8),
+            EntitiesSourceMap(source_id=5, entity_id=9),
+            EntitiesSourceMap(source_id=1, entity_id=10),
+        ]
+        
+        # 添加所有测试数据到数据库
+        db.session.add_all(entities_data)
+        db.session.add_all(catalog_data)
+        db.session.add_all(sources_data)
+        db.session.add_all(source_map_data)
         db.session.commit()
     
     def test_get_domains_tree(self):
@@ -200,6 +246,63 @@ class EntitiesRoutesTestCase(unittest.TestCase):
         # 验证响应数据是否为列表格式
         data = json.loads(response.data)
         self.assertIsInstance(data, list)
+    
+    def test_get_entities_count_by_source_type(self):
+        """
+        测试统计Entities Source表中不同source_type对应的实体数量的API端点
+        """
+        # 发送GET请求
+        response = self.client.get('/api/entities/count-by-source-type')
+        
+        # 检查响应状态码
+        self.assertEqual(response.status_code, 200)
+        
+        # 检查响应数据
+        data = json.loads(response.data)
+        self.assertIsInstance(data, dict)
+        
+        # 验证返回的数据是否符合预期
+        # 根据我们的测试数据：
+        # 数据库类型应该有4个实体 (source_id=1关联了entity_id=1,2,10; source_id=4关联了entity_id=6,7)
+        # API接口类型应该有3个实体 (source_id=2关联了entity_id=3,4; source_id=5关联了entity_id=8,9)
+        # 文件系统类型应该有1个实体 (source_id=3关联了entity_id=5)
+        expected_counts = {
+            "数据库": 4,
+            "API接口": 3,
+            "文件系统": 1
+        }
+        
+        # 验证每种source_type的数量是否正确
+        for source_type, expected_count in expected_counts.items():
+            self.assertIn(source_type, data)
+            self.assertEqual(data[source_type], expected_count, 
+                           f"{source_type}的数量应该是{expected_count}，但实际是{data[source_type]}")
+        
+        # 验证只返回了这三种source_type，没有其他类型
+        self.assertEqual(len(data), len(expected_counts))
+    
+    def test_get_entities_count_by_source_type_empty_database(self):
+        """
+        测试当数据库中没有数据时，统计API的行为
+        """
+        with self.app.app_context():
+            # 清空数据源映射表
+            EntitiesSourceMap.query.delete()
+            # 清空数据源表
+            EntitiesSources.query.delete()
+            # 提交更改
+            db.session.commit()
+        
+        # 发送GET请求
+        response = self.client.get('/api/entities/count-by-source-type')
+        
+        # 检查响应状态码
+        self.assertEqual(response.status_code, 200)
+        
+        # 检查响应数据应该是空字典
+        data = json.loads(response.data)
+        self.assertIsInstance(data, dict)
+        self.assertEqual(len(data), 0)
 
 
 if __name__ == '__main__':

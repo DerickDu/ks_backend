@@ -270,6 +270,113 @@ class EntityDetailRoutesTestCase(unittest.TestCase):
         # 验证响应内容
         data = json.loads(response.data)
         self.assertIn('error', data)
+    
+    def test_search_entities_success(self):
+        """测试成功搜索实体"""
+        # 创建额外的测试数据用于搜索
+        with app.app_context():
+            entity3 = Entities(
+                entity_id=3,
+                entity_name="搜索测试实体",
+                description="这是一个用于搜索测试的实体",
+                validity_result=True,
+                validity_method="method3",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            
+            entity4 = Entities(
+                entity_id=4,
+                entity_name="另一个实体",
+                description="包含搜索关键词的描述",
+                validity_result=False,
+                validity_method="method4",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            
+            db.session.add_all([entity3, entity4])
+            db.session.commit()
+        
+        # 测试搜索entity_name
+        response = self.client.get('/api/entity-detail/search?search_text=搜索')
+        
+        # 验证响应状态码
+        self.assertEqual(response.status_code, 200)
+        
+        # 验证响应内容
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['message'], '查询成功')
+        self.assertIn('data', data)
+        self.assertGreaterEqual(len(data['data']), 1)
+        
+        # 验证返回的数据结构
+        entity_data = data['data'][0]
+        self.assertIn('entity_id', entity_data)
+        self.assertIn('entity_name', entity_data)
+        self.assertIn('description', entity_data)
+    
+    def test_search_entities_by_description(self):
+        """测试通过description搜索实体"""
+        # 测试搜索description
+        response = self.client.get('/api/entity-detail/search?search_text=测试')
+        
+        # 验证响应状态码
+        self.assertEqual(response.status_code, 200)
+        
+        # 验证响应内容
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'success')
+        self.assertIn('data', data)
+    
+    def test_search_entities_no_results(self):
+        """测试搜索无结果的情况"""
+        response = self.client.get('/api/entity-detail/search?search_text=不存在的实体')
+        
+        # 验证响应状态码
+        self.assertEqual(response.status_code, 200)
+        
+        # 验证响应内容
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['message'], '查询成功')
+        self.assertIn('data', data)
+        self.assertEqual(len(data['data']), 0)
+    
+    def test_search_entities_missing_param(self):
+        """测试缺少search_text参数"""
+        response = self.client.get('/api/entity-detail/search')
+        
+        # 验证响应状态码
+        self.assertEqual(response.status_code, 400)
+        
+        # 验证响应内容
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'error')
+    
+    def test_search_entities_empty_param(self):
+        """测试空的search_text参数"""
+        response = self.client.get('/api/entity-detail/search?search_text=')
+        
+        # 验证响应状态码
+        self.assertEqual(response.status_code, 400)
+        
+        # 验证响应内容
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'error')
+    
+    def test_search_entities_invalid_param(self):
+        """测试无效的search_text参数（过长）"""
+        long_text = 'a' * 101  # 超过100字符限制
+        response = self.client.get(f'/api/entity-detail/search?search_text={long_text}')
+        
+        # 验证响应状态码
+        self.assertEqual(response.status_code, 400)
+        
+        # 验证响应内容
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'error')
 
 
 if __name__ == '__main__':

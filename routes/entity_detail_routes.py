@@ -25,6 +25,23 @@ class EntityIdValidator(BaseModel):
             raise ValueError("实体ID必须大于0")
         return v
 
+
+class SearchTextValidator(BaseModel):
+    """
+    搜索文本参数验证器
+    用于验证模糊搜索API中的search_text参数
+    """
+    search_text: str = Field(..., min_length=1, max_length=100, description="搜索文本，长度1-100个字符")
+    
+    @field_validator('search_text')
+    def validate_search_text(cls, v):
+        """验证搜索文本的合理性"""
+        # 去除首尾空格
+        v = v.strip()
+        if not v:
+            raise ValueError("搜索文本不能为空")
+        return v
+
 # 创建entity_detail蓝图实例
 entity_detail_bp = Blueprint('entity_detail', __name__, url_prefix='/api/entity-detail')
 
@@ -268,3 +285,103 @@ def get_entity_sources_by_id():
         # 注意：在生产环境中，通常不应该暴露详细的错误信息给客户端
         # 但在开发环境中，可以提供更多调试信息
         return jsonify({"error": "服务器内部错误", "details": str(e)}), 500
+
+
+@entity_detail_bp.route('/search', methods=['GET'])
+@validate_query_params(validator_class=SearchTextValidator)
+def search_entities():
+    """
+    在Entity表中对entity_name和description字段执行模糊搜索
+    
+    查询参数：
+    - search_text: 搜索文本（必需，字符串类型，长度1-100个字符）
+    
+    响应格式：
+    - 成功: {"status": "success", "message": "查询成功", "data": [{"entity_id": <id>, "entity_name": <name>, "description": <description>}, ...]}
+    - 失败: {"status": "error", "message": "错误信息", "error_code": "错误代码"}
+    
+    HTTP状态码：
+    - 200: 成功获取搜索结果
+    - 400: 参数错误
+    - 500: 服务器内部错误
+    """
+    try:
+        # 记录API调用日志
+        logger.info("调用实体模糊搜索API，search_text: %s", request.validated_params.get('search_text'))
+        
+        # 获取验证后的参数
+        search_text = request.validated_params.get('search_text')
+        
+        # 构造模糊搜索查询
+        # 使用LIKE操作符进行模糊搜索，%表示任意字符序列（包括空字符序列）
+        search_pattern = f"%{search_text}%"
+        
+        # 对entity_name和description字段同时进行模糊搜索
+        # 使用OR条件连接两个搜索条件
+        # 使用order_by配合case_when来实现简单的匹配度排序
+        # 优先匹配entity_name字段，然后是description字段
+        entities = Entities.query.filter(
+            db.or_(
+                Entities.entity_name.ilike(search_pattern),
+                Entities.description.ilike(search_pattern)
+            )
+        ).order_by(
+            # 先按entity_name匹配度排序，再按description匹配度排序
+            # 这里简化处理，优先显示entity_name匹配的记录
+            db.case(
+                (Entities.entity_name.ilike(search_pattern), 1),
+                else_=2
+            )
+        ).limit(20).all()
+        
+        # 构造响应数据
+        entities_data = []
+        for entity in entities:
+            entities_data.append({
+                "entity_id": entity.entity_id,
+                "entity_name": entity.entity_name,
+                "description": entity.description,
+                "validity_result": entity.validity_result,
+                "validity_method": entity.validity_method,
+                "created_at": entity.created_at.isoformat() if entity.created_at else None,
+                "updated_at": entity.updated_at.isoformat() if entity.updated_at else None
+            })
+        
+        logger.info("成功完成实体模糊搜索，搜索词: %s, 结果数量: %d", search_text, len(entities_data))
+        
+        # 返回统一格式的成功响应
+        return jsonify({
+            "status": "success",
+            "message": "查询成功",
+            "data": entities_data
+        }), 200
+        
+    except ValueError as e:
+        # 参数验证错误
+        logger.error("参数验证错误: %s", str(e))
+        return jsonify({
+            "status": "error",
+            "message": f"参数错误: {str(e)}",
+            "error_code": "INVALID_PARAMETER"
+        }), 400
+    except SQLAlchemyError as e:
+        # 数据库错误
+        logger.error("数据库操作错误: %s", str(e))
+        # 使用统一的错误处理函数处理数据库错误
+        error_response, status_code = handle_db_error(e)
+        # 确保返回统一格式
+        if not isinstance(error_response.get("status"), str):
+            return jsonify({
+                "status": "error",
+                "message": error_response.get("error", "数据库操作错误"),
+                "error_code": "DATABASE_ERROR"
+            }), status_code
+        return error_response, status_code
+    except Exception as e:
+        # 未预期的错误
+        logger.error("未预期的服务器错误: %s", str(e), exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "服务器内部错误",
+            "error_code": "INTERNAL_ERROR"
+        }), 500

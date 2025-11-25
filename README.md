@@ -138,7 +138,28 @@ python3 app.py
 - 200: 成功
 - 500: 服务器内部错误
 
-### 2. 按域统计实体数量
+### 2. 按源类型统计实体数量
+
+**端点：** `GET /api/entities/count-by-source-type`
+
+**功能：** 统计不同 source_type 对应的实体数量，通过关联 EntitiesSourceMap 表确保每个实体只计算一次。
+
+**响应格式：**
+
+```json
+{
+  "数据库": 15,
+  "API接口": 23,
+  "文件系统": 10
+}
+```
+
+**状态码：**
+
+- 200: 成功
+- 500: 服务器内部错误
+
+### 3. 按域统计实体数量
 
 **端点：** `GET /api/entities/count-by-domain`
 
@@ -159,7 +180,7 @@ python3 app.py
 - 200: 成功
 - 500: 服务器内部错误
 
-### 3. 获取 Domain 和 SubDomain 树形结构
+### 4. 获取 Domain 和 SubDomain 树形结构
 
 **端点：** `GET /api/entities/domains-tree`
 
@@ -199,7 +220,7 @@ python3 app.py
 - 200: 成功
 - 500: 服务器内部错误
 
-### 4. 获取实体和目录树形结构
+### 5. 获取实体和目录树形结构
 
 **端点：** `GET /api/entities-tree`
 
@@ -253,7 +274,7 @@ python3 app.py
 - 400: 请求参数错误
 - 500: 服务器内部错误
 
-### 5. 通过实体 ID 获取实体详情
+### 6. 通过实体 ID 获取实体详情
 
 **端点：** `GET /api/entity-detail/entity`
 
@@ -284,7 +305,7 @@ python3 app.py
 - 404: 实体不存在
 - 500: 服务器内部错误
 
-### 6. 通过实体 ID 获取实体源数据
+### 7. 通过实体 ID 获取实体源数据
 
 **端点：** `GET /api/entity-detail/entity-sources`
 
@@ -325,7 +346,7 @@ python3 app.py
 - 400: 参数错误
 - 500: 服务器内部错误
 
-### 7. 健康检查
+### 8. 健康检查
 
 **端点：** `GET /health`
 
